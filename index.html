@@ -1,0 +1,1815 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>極速單字挑戰 - 巨型山道 (Enhanced v2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Russo+One&display=swap');
+
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: #0f1012; 
+      color: white;
+      height: 100vh;
+      height: 100dvh; 
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      overscroll-behavior: none;
+    }
+
+    .game-font { font-family: 'Russo One', sans-serif; }
+
+    /* --- 遊戲主框架 --- */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 3fr 1fr;
+      grid-template-rows: 100%;
+      width: 98%; max-width: 1400px;
+      height: 95vh; max-height: 900px;
+      background: #111;
+      border-radius: 4px;
+      box-shadow: 0 0 50px rgba(0,0,0,0.9);
+      overflow: hidden;
+      border: 2px solid #222;
+    }
+
+    @media (max-width: 768px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+        /* 調整比例：遊戲畫面 75%，下方儀表板 25% */
+        grid-template-rows: 75% 25%;      
+        width: 100%;
+        height: 100%;
+        max-height: none;
+        border-radius: 0;
+        border: none;
+      }
+      .track-panel { border-right: none !important; border-bottom: 2px solid #333; }
+      
+      /* 緊湊化儀表板樣式 */
+      .dashboard-panel { 
+        border-left: none !important; 
+        padding: 8px 12px !important; 
+        overflow-y: hidden;
+        justify-content: space-between;
+      }
+      
+      /* 標題欄緊湊化 */
+      .dashboard-panel > div:first-child {
+        margin-bottom: 4px !important;
+        padding-bottom: 4px !important;
+        border-bottom: 1px solid #333;
+      }
+      
+      /* 標題文字縮小並改為單行 */
+      .dashboard-panel h1 { 
+        font-size: 1rem !important; 
+        display: flex; 
+        align-items: center; 
+        gap: 5px;
+      }
+      .dashboard-panel h1 br { display: none; }
+
+      /* 題目區域改為橫向排列 */
+      #questionArea {
+        padding-top: 0 !important;
+        flex-direction: row !important;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+      }
+
+      /* 題目卡片簡化 */
+      .question-card { 
+        padding: 0 !important; 
+        margin-bottom: 0 !important; 
+        background: none !important;
+        box-shadow: none !important;
+        border: none !important;
+        width: auto !important;
+        text-align: left;
+      }
+      .question-card h2 { font-size: 1.4rem !important; }
+
+      /* 回饋訊息移至右側 */
+      #feedback {
+        margin-top: 0 !important;
+        height: auto !important;
+        text-align: right;
+      }
+
+      .controls-hint { display: none !important; }
+      
+      /* Start Screen 適應矮畫面 */
+      #startScreen { padding: 0 20px; }
+      #startScreen .text-6xl { display: none; } /* 隱藏 emoji */
+      #startScreen h2 { font-size: 1.2rem !important; margin-bottom: 5px !important; }
+      #startScreen p { display: none; }
+      #startScreen button { 
+        padding: 6px 0 !important; 
+        font-size: 1rem !important; 
+        height: auto !important;
+      }
+
+      /* Result Screen 適應矮畫面 (新增修正) */
+      #resultScreen { padding: 0 20px; justify-content: center; }
+      #resultScreen .text-6xl { display: none; } /* 隱藏 emoji */
+      #resultScreen h2 { font-size: 1.5rem !important; margin-bottom: 2px !important; }
+      #resultScreen p { font-size: 0.9rem !important; margin-bottom: 8px !important; }
+      #resultScreen button { 
+        padding: 8px 0 !important; 
+        font-size: 1rem !important; 
+        height: auto !important;
+        width: 100%;
+      }
+
+      /* 進度條區域 */
+      .mt-auto { padding-top: 2px !important; }
+    }
+
+    /* --- 賽道場景 --- */
+    .track-panel {
+      position: relative;
+      background: linear-gradient(to bottom, #3b82f6 0%, #93c5fd 60%, #e0f2fe 100%);
+      overflow: hidden;
+      perspective: 800px; 
+      border-right: 4px solid #000;
+      cursor: crosshair; 
+      touch-action: none; 
+      width: 100%;
+      height: 100%;
+    }
+
+    .track-panel::before {
+        content: '';
+        position: absolute;
+        bottom: 40%; left: 0; right: 0; height: 40%;
+        background: linear-gradient(to top, #4b5563, transparent);
+        opacity: 0.5;
+        z-index: 1;
+        clip-path: polygon(0% 100%, 15% 60%, 30% 90%, 50% 50%, 70% 80%, 85% 60%, 100% 100%);
+    }
+
+    .input-layer {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000;
+    }
+
+    .scene-container {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      transform-style: preserve-3d;
+      z-index: 2;
+    }
+
+    .wall {
+      position: absolute;
+      top: -20%;
+      bottom: -20%;
+      width: 40%; 
+      z-index: 10; 
+      background-color: #57534e; 
+      background-image: 
+        linear-gradient(to right, rgba(0,0,0,0.3), transparent, rgba(0,0,0,0.3)),
+        linear-gradient(to bottom, #57534e, #44403c);
+      background-size: 100% 100%;
+      box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+    }
+
+    .side-left {
+      left: -35%;  
+      transform-origin: left center;
+      transform: skewY(10deg) scaleX(1.2); 
+      clip-path: polygon(0% 0%, 100% 0%, 85% 10%, 95% 20%, 80% 35%, 90% 50%, 82% 65%, 95% 80%, 85% 90%, 100% 100%, 0% 100%);
+      border-right: none; 
+      filter: drop-shadow(10px 0 10px rgba(0,0,0,0.5));
+    }
+
+    .side-right {
+      right: -35%; 
+      transform-origin: right center;
+      transform: skewY(-10deg) scaleX(1.2); 
+      clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 15% 90%, 5% 80%, 18% 65%, 10% 50%, 20% 35%, 5% 20%, 15% 10%);
+      border-left: none;
+      filter: drop-shadow(-10px 0 10px rgba(0,0,0,0.5));
+    }
+
+    .road-container {
+      position: absolute;
+      top: -20%; left: -100%; width: 300%; height: 150%;
+      transform-origin: 50% 100%;
+      transform: rotateX(60deg); 
+      z-index: 5; 
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 25%);
+      mask-image: linear-gradient(to bottom, transparent 0%, black 25%);
+    }
+
+    .road {
+      width: 100%; height: 100%;
+      background-color: #333;
+      background-image: 
+        linear-gradient(to right, transparent 49%, #d97706 49%, #d97706 49.5%, transparent 49.5%, transparent 50.5%, #d97706 50.5%, #d97706 51%, transparent 51%),
+        linear-gradient(to right, rgba(255,255,255,0.8) 18%, transparent 18%, transparent 82%, rgba(255,255,255,0.8) 82%),
+        radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.4) 100%),
+        linear-gradient(to right, #57534e 0%, #57534e 17%, transparent 17%, transparent 83%, #57534e 83%, #57534e 100%);
+      background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+      background-blend-mode: normal, normal, overlay, normal;
+      animation: roadScroll 0.1s linear infinite;
+    }
+
+    @keyframes roadScroll {
+      from { background-position: 0 0, 0 0, 0 0, 0 0; }
+      to { background-position: 0 100px, 0 100px, 0 0, 0 100px; }
+    }
+
+    /* --- 實體系統 --- */
+    .game-object {
+      position: absolute;
+      transform-style: preserve-3d;
+      display: flex; justify-content: center; align-items: center;
+      will-change: top, left, transform;
+      transform-origin: center bottom; 
+    }
+
+    .car-size { width: 50px; height: 90px; }
+
+    @media (max-width: 768px) {
+      .car-size {
+        width: 13vw; 
+        height: 24vw; 
+        max-width: 60px;
+        max-height: 110px;
+      }
+      #playerCar { margin-left: -6.5vw !important; }
+    }
+
+    #playerCar {
+      left: 50%; margin-left: -25px; 
+      /* [修改] 調整玩家層級，配合動態 Z-index 確保遮擋關係正確 */
+      z-index: 3500; 
+      pointer-events: none;
+    }
+
+    @keyframes engineRumble {
+      0% { transform: translate(0, 0) rotate(0deg); }
+      25% { transform: translate(1px, 1px) rotate(0.5deg); }
+      50% { transform: translate(-1px, 0) rotate(0deg); }
+      75% { transform: translate(0, -1px) rotate(-0.5deg); }
+      100% { transform: translate(0, 0) rotate(0deg); }
+    }
+
+    .car-body {
+      width: 100%; height: 100%;
+      position: relative;
+      filter: drop-shadow(0 20px 10px rgba(0,0,0,0.6));
+      animation: engineRumble 0.1s infinite linear;
+    }
+
+    .smoke-particle {
+      position: absolute;
+      width: 12px; height: 12px;
+      background: rgba(200, 200, 200, 0.4);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 900; 
+      filter: blur(2px);
+      animation: smokeTrail 0.6s ease-out forwards;
+    }
+
+    @keyframes smokeTrail {
+      0% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+      100% { transform: translate(0, 150px) scale(4); opacity: 0; }
+    }
+
+    .enemy-smoke {
+      position:absolute; border-radius:50%; pointer-events:none;
+      background:radial-gradient(circle,rgba(210,215,218,.65),rgba(130,140,150,.25) 45%,transparent 72%);
+      will-change:transform,opacity;
+    }
+
+    .health-star {
+      width:48px; height:48px; font-size:38px; line-height:1;
+      color:#fde047; text-shadow:0 0 7px #facc15;
+      border-radius:50%; background:radial-gradient(ellipse,rgba(34,197,94,.45),transparent 72%);
+      pointer-events:none;
+    }
+    .health-star::after {
+      content:'+'; position:absolute; right:0; top:0;
+      font-size:18px; font-weight:900; color:#86efac;
+      text-shadow:0 1px 3px #052e16;
+    }
+    .word-item {
+      color: #ffffff;
+      background: linear-gradient(to bottom, #059669, #047857);
+      font-weight: 900;
+      font-family: 'Noto Sans TC', sans-serif;
+      font-size: 40px; 
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: 4px solid white;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.6);
+      text-shadow: 2px 2px 0px rgba(0,0,0,0.5);
+      white-space: nowrap;
+      text-align: center;
+    }
+    
+    .lane-warning {
+      position: absolute;
+      top: 35%; /* HORIZON_Y_PCT */
+      width: 40px; height: 40px;
+      margin-left: -20px; 
+      border-radius: 50%;
+      color: white;
+      font-weight: 900;
+      font-size: 24px;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200; 
+      animation: warningPulse 0.3s infinite alternate;
+      box-shadow: 0 0 15px rgba(0,0,0,0.5);
+      border: 3px solid white;
+    }
+
+    .rock-warning { background: rgba(220, 38, 38, 0.9); box-shadow: 0 0 10px #ef4444; }
+    .traffic-warning { background: rgba(234, 179, 8, 0.9); box-shadow: 0 0 10px #eab308; color: black; }
+
+    @keyframes warningPulse {
+      from { transform: scale(1); opacity: 1; }
+      to { transform: scale(1.2); opacity: 0.8; }
+    }
+
+    .rock-obstacle { width:40px; height:34px; pointer-events:none; }
+    @media (max-width:768px), (max-height:600px) { .rock-obstacle { width:30px; height:26px; } }
+    .rock-shadow { position:absolute; left:4px; right:4px; bottom:-2px; height:10px;
+      background:radial-gradient(ellipse,rgba(0,0,0,.75),transparent 72%); }
+    .rock-body { position:absolute; left:3px; right:3px; top:3px; bottom:1px;
+      background:linear-gradient(140deg,#b9b1a2 0%,#898479 32%,#514f48 66%,#363731 100%);
+      clip-path:polygon(15% 8%,57% 0,89% 23%,100% 62%,73% 96%,27% 100%,0 58%);
+      box-shadow:inset -6px -5px 7px #292923; transform-origin:50% 85%; }
+    .rock-body::after { content:''; position:absolute; inset:5px 9px 8px 5px;
+      border-top:2px solid #d1c9b666; border-right:2px solid #302e2777; transform:rotate(-20deg); }
+    .rock-dust { position:absolute; left:-4px; right:-4px; bottom:-4px; height:15px;
+      border-radius:50%; background:radial-gradient(ellipse,#b6a38499,transparent 70%); opacity:0; }
+
+    .car-img {
+      width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 2;
+    }
+
+    .fallback-rect {
+      display: none; width: 80%; height: 90%; border-radius: 16px;
+      margin: 0 auto; position: absolute; top: 5%; left: 10%; z-index: 1; border: 1px solid rgba(0,0,0,0.3);
+    }
+    
+    .boost-fire {
+      position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%);
+      width: 20px; height: 50px;
+      background: linear-gradient(to bottom, #60a5fa, transparent);
+      opacity: 0; transition: opacity 0.2s; z-index: 0; filter: blur(2px);
+    }
+    .boosting .boost-fire { opacity: 1; }
+
+    .player-hit .car-body { animation: damageFlash 0.2s ease-in-out 3; }
+    @keyframes damageFlash {
+      0%, 100% { filter: drop-shadow(0 20px 10px rgba(0,0,0,0.6)); }
+      50% { filter: sepia(1) hue-rotate(-50deg) saturate(3) drop-shadow(0 0 10px red); }
+    }
+
+    .shake-screen { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+    @keyframes shake { 
+      10%, 90% { transform: translate3d(-3px, 0, 0); }
+      20%, 80% { transform: translate3d(5px, 0, 0); }
+      30%, 50%, 70% { transform: translate3d(-7px, 0, 0); }
+      40%, 60% { transform: translate3d(7px, 0, 0); }
+    }
+
+    .anim-collect { animation: collectFly 0.5s ease-out forwards; }
+    @keyframes collectFly {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(2) translateY(-100px); opacity: 0; }
+    }
+
+    .anim-flip-crash { animation: flipOver 0.6s ease-out forwards; }
+    @keyframes flipOver {
+      0% { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 1; }
+      100% { transform: translate3d(300px, -400px, 100px) rotate(720deg) scale(0.5); opacity: 0; }
+    }
+    .anim-flip-crash-left { animation: flipOverLeft 0.6s ease-out forwards; }
+    @keyframes flipOverLeft {
+      0% { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 1; }
+      100% { transform: translate3d(-300px, -400px, 100px) rotate(-720deg) scale(0.5); opacity: 0; }
+    }
+
+    /* --- UI --- */
+    .dashboard-panel {
+      padding: 20px; background: #0a0a0a;
+      display: flex; flex-direction: column;
+      position: relative;
+      border-left: 1px solid #333;
+    }
+    .heart { font-size: 20px; color: #ef4444; margin: 0 1px; text-shadow: 0 0 5px red; }
+    .heart.lost { color: #333; text-shadow: none; }
+    
+    .question-card {
+      background: linear-gradient(135deg, #1f2937 0%, #111827 100%); 
+      border-left: 4px solid #f59e0b;
+      padding: 15px; margin-bottom: 20px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+      text-align: center;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .controls-hint {
+      display: flex; justify-content: center; gap: 10px; margin-top: 20px; flex-wrap: wrap;
+    }
+    .key-hint {
+      display: flex; justify-content: center; align-items: center;
+      padding: 8px 16px;
+      background: #262626; border-radius: 6px; border: 1px solid #404040;
+      color: #d4d4d4; font-size: 13px;
+    }
+    .icon-mouse { font-size: 20px; margin-right: 6px; }
+
+
+    /* --- Dynamic curved road redesign --- */
+    .track-panel {
+      --road-shift: 0%;
+      --road-curve: 0deg;
+      --horizon-shift: 0%;
+    }
+
+    .road-container {
+      transition: transform 220ms ease-out, left 220ms ease-out;
+      left: calc(-100% + var(--road-shift));
+      transform: rotateX(60deg) rotateZ(var(--road-curve));
+    }
+
+    .road {
+      position: relative;
+      overflow: hidden;
+      background-color: #2f3136;
+      background-image:
+        linear-gradient(to right,
+          #57534e 0%, #57534e 17%,
+          rgba(255,255,255,.9) 17%, rgba(255,255,255,.9) 17.6%,
+          transparent 17.6%, transparent 49.5%,
+          #f59e0b 49.5%, #f59e0b 50.5%,
+          transparent 50.5%, transparent 82.4%,
+          rgba(255,255,255,.9) 82.4%, rgba(255,255,255,.9) 83%,
+          #57534e 83%, #57534e 100%);
+    }
+
+    .road::before,
+    .road::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .road::before {
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0 75px,
+        rgba(255,255,255,.65) 75px 105px,
+        transparent 105px 180px
+      );
+      width: 1.1%;
+      left: 49.45%;
+      opacity: .75;
+      animation: dashScroll .55s linear infinite;
+    }
+
+    .road::after {
+      background: radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,.5) 88%);
+    }
+
+    @keyframes dashScroll {
+      from { transform: translateY(-180px); }
+      to { transform: translateY(0); }
+    }
+
+    .curve-guide {
+      position: absolute;
+      top: 31%;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 12;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.55);
+      border: 1px solid rgba(255,255,255,.25);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      color: #fde68a;
+      pointer-events: none;
+      backdrop-filter: blur(3px);
+    }
+
+    .road-edge-left,
+    .road-edge-right {
+      position: absolute;
+      top: 34%;
+      bottom: -8%;
+      width: 4px;
+      z-index: 15;
+      background: repeating-linear-gradient(to bottom,#fff 0 18px,#ef4444 18px 36px);
+      opacity: .9;
+      transform-origin: top center;
+      pointer-events: none;
+    }
+    .road-edge-left { left: calc(16.8% + var(--road-shift)); transform: rotate(var(--road-curve)); }
+    .road-edge-right { right: calc(16.8% - var(--road-shift)); transform: rotate(var(--road-curve)); }
+
+    /* Road geometry is drawn in track-panel coordinates, without CSS rotation. */
+    .road-container, .road-edge-left, .road-edge-right { display: none; }
+    #roadCanvas { position:absolute; inset:0; width:100%; height:100%; z-index:6; pointer-events:none; }
+    #gameEntities .game-object { margin-left:0; transform-origin:center bottom; }
+    #playerCar { margin-left:0 !important; }
+    #playerCar .car-body { animation:none; filter:drop-shadow(0 3px 2px rgba(0,0,0,.65)); }
+    #playerCar.player-hit .car-body { animation:damageFlash .2s ease-in-out 3; }
+
+    /* Device layout: browser chrome, notches, portrait tablets and short landscape screens. */
+    * { box-sizing: border-box; }
+    html { height: 100%; background: #0f1012; }
+    body { margin: 0; height: var(--app-height, 100dvh);
+      padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+               env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+      -webkit-user-select: none; -webkit-text-size-adjust: 100%; }
+    .main-grid { height: 100%; grid-template-columns: minmax(0, 3fr) minmax(240px, 1fr); }
+    .track-panel, .dashboard-panel { min-width: 0; min-height: 0; }
+    .dashboard-panel > .flex-grow { min-height: 0; }
+    button { min-height: 44px; touch-action: manipulation; }
+    #startScreen, #resultScreen { overflow-y: auto; }
+    #qText { overflow-wrap: anywhere; font-size: clamp(20px, 2.6vw, 36px); }
+    .device-hint { font-size: 11px; color: #9ca3af; text-align: center; margin-top: 4px; }
+    @media (max-width: 768px), (orientation: portrait) and (max-width: 1100px) {
+      .main-grid { width: 100%; max-height: none; border: 0;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) clamp(180px, 27%, 260px); }
+      .dashboard-panel { padding: 8px 12px !important; }
+      .dashboard-panel > div:first-child { margin-bottom: 4px !important; padding-bottom: 4px !important; }
+      .dashboard-panel h1 { font-size: 1rem !important; }
+      .dashboard-panel h1 br { display: none; }
+      #questionArea { padding: 0 !important; flex-direction: row !important; gap: 12px; }
+      .question-card { padding: 4px !important; margin: 0; flex: 1; }
+      #feedback { height: auto; margin: 0; }
+      .controls-hint, #startScreen > .text-6xl, #startScreen p, #resultScreen > .text-6xl { display: none; }
+      #startScreen h2, #resultScreen h2 { font-size: 20px !important; margin: 0 0 4px !important; }
+      #resultScreen p { margin-bottom: 4px !important; }
+      .mt-auto { padding-top: 2px !important; }
+    }
+    @media (orientation: landscape) and (max-height: 600px) {
+      .main-grid { width: 100%; max-height: none; border: 0;
+        grid-template-columns: minmax(0, 1fr) clamp(200px, 30vw, 280px); grid-template-rows: 100%; }
+      .dashboard-panel { padding: 8px 12px !important; }
+      .dashboard-panel > div:first-child { margin-bottom: 4px !important; padding-bottom: 4px !important; }
+      .dashboard-panel h1 { font-size: 1rem !important; }
+      .dashboard-panel h1 br { display: none; }
+      #startScreen > .text-6xl, #startScreen p, #resultScreen > .text-6xl, .controls-hint { display: none; }
+      #startScreen h2, #resultScreen h2 { font-size: 18px !important; margin-bottom: 6px !important; }
+      #resultScreen p { margin-bottom: 6px !important; }
+      .question-card { padding: 4px !important; margin-bottom: 4px !important; }
+      #qText { font-size: 22px !important; }
+      .car-size { width: 32px; height: 58px; }
+      .mt-auto { padding-top: 2px !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="main-grid">
+    <div class="track-panel" id="trackPanel">
+      <div class="input-layer" id="inputLayer"></div>
+      
+      <div class="scene-container">
+        <!-- 山壁 -->
+        <div class="wall side-left"></div>
+        <div class="wall side-right"></div>
+
+        <div class="road-container" id="roadContainer">
+          <div class="road" id="road"></div>
+        </div>
+      </div>
+      
+      <canvas id="roadCanvas" aria-label="連續山路"></canvas>
+
+      <div class="road-edge-left"></div>
+      <div class="road-edge-right"></div>
+
+      <div id="gameEntities"></div>
+
+      <!-- Player Car -->
+      <div class="game-object car-size" id="playerCar">
+        <div class="car-body">
+          <img src="player.png" class="car-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          <div class="fallback-rect bg-red-600 shadow-lg" style="display:none"></div>
+          <div class="boost-fire"></div>
+        </div>
+        <div class="absolute -bottom-8 text-[12px] font-bold text-yellow-400 tracking-wider bg-black bg-opacity-70 px-2 rounded backdrop-blur-sm border border-yellow-600">YOU</div>
+      </div>
+    </div>
+
+    <div class="dashboard-panel">
+      <div class="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
+        <div>
+          <h1 class="text-xl md:text-2xl text-white game-font italic transform -skew-x-12 tracking-tighter" style="text-shadow: 0 0 10px rgba(255,255,255,0.3);">
+            TOUGE<br><span class="text-yellow-500">DRIFT</span>
+          </h1>
+        </div>
+        <div class="text-right">
+          <div id="healthBar" class="mb-1 flex justify-end"></div>
+          <div class="text-[10px] text-gray-500 uppercase tracking-widest font-bold">答對題數</div>
+          <div class="text-xl font-mono text-blue-400" id="correctCountDisplay">0</div>
+        </div>
+      </div>
+
+      <div class="flex-grow relative">
+        <div id="startScreen" class="absolute inset-0 z-20 flex flex-col items-center justify-center text-center">
+          <div class="text-6xl mb-6 filter drop-shadow-lg">🏔️🏎️</div>
+          <h2 class="text-2xl font-bold mb-3 text-white tracking-wide">山道競速單字戰</h2>
+          <p class="text-gray-400 text-xs mb-8 px-4 leading-relaxed">
+            <span class="text-white font-bold">滑鼠 / 觸控</span> 控制轉向<br>
+            收集 <span class="text-green-400 font-bold border border-green-800 px-1 rounded bg-green-900 bg-opacity-30">正確翻譯路牌</span><br>
+            閃避 <span class="text-red-400 font-bold">對向來車</span> 與 <span class="text-yellow-400 font-bold">敵方子彈</span><br>
+            小心 <span class="text-gray-400 font-bold">山壁落石</span>
+          </p>
+          <button onclick="startGame()" class="game-font w-full bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white text-lg py-4 rounded-sm shadow-xl transform transition hover:translate-y-[-2px] tracking-widest border-b-4 border-red-900">
+            ENGINE START
+          </button>
+        </div>
+
+        <div id="resultScreen" class="hidden absolute inset-0 z-20 flex flex-col items-center justify-center text-center bg-black bg-opacity-90 rounded-xl backdrop-blur-sm">
+          <div class="text-6xl mb-4 animate-pulse" id="resultEmoji">💥</div>
+          <h2 class="text-3xl font-bold mb-2 text-white game-font italic" id="resultTitle">GAME OVER</h2>
+          <p class="text-gray-400 mb-8 text-sm" id="resultDesc">...</p>
+          <button onclick="startGame()" class="w-full bg-white text-black font-bold py-3 rounded-sm shadow-lg hover:bg-gray-200 transition">
+            RESTART
+          </button>
+        </div>
+
+        <div id="questionArea" class="hidden flex flex-col h-full items-center pt-2 md:pt-4">
+          <div class="text-gray-500 text-[10px] uppercase mb-1 font-bold tracking-widest md:block hidden">MISSION TARGET</div>
+          <div class="question-card w-full transform transition hover:scale-[1.02]">
+            <h2 id="qText" class="text-2xl md:text-4xl font-bold text-white leading-tight">...</h2>
+          </div>
+          
+          <div id="feedback" class="h-8 mt-2 text-center font-bold text-sm tracking-wider"></div>
+
+          <div class="controls-hint">
+            <div class="key-hint"><span class="icon-mouse">🖱️</span> MOUSE</div>
+            <div class="key-hint"><span class="icon-mouse">👆</span> TOUCH</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="device-hint">↑ 加速 · 觸控：按住賽道前方加速<br><span id="speedStatus">巡航</span> · <span id="slopeStatus">平緩路段</span></div>
+      <div class="mt-auto pt-4">
+        <div class="flex justify-between text-[10px] text-gray-500 mb-1 font-mono">
+          <span>DISTANCE</span>
+          <span id="progressText">0%</span>
+        </div>
+        <div class="w-full bg-gray-900 h-1 rounded-full overflow-hidden border border-gray-800">
+          <div id="progressBar" class="bg-yellow-500 h-full w-0 transition-all duration-300 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 題目資料
+    const questionsData = [
+      { zh: "辯論社", en: "debate club" }, { zh: "困難的", en: "difficult" },
+      { zh: "攝影社", en: "photography club" }, { zh: "西洋棋社", en: "chess club" },
+      { zh: "合唱團", en: "choir" }, { zh: "手語社", en: "sign language club" },
+      { zh: "話劇社", en: "drama club" }, { zh: "登山社", en: "hiking club" },
+      { zh: "樂團", en: "band" }, { zh: "國際標準舞社", en: "ballroom dancing club" },
+      { zh: "愉快", en: "pleasure" }, { zh: "烹飪社", en: "cooking club" },
+      { zh: "順便提一下", en: "by the way" }, { zh: "感到有興趣", en: "interested in" },
+      { zh: "遇見", en: "meet" }, { zh: "幫助", en: "help out" },
+      { zh: "友善的", en: "friendly" }, { zh: "禮堂", en: "hall" },
+      { zh: "有幫助的", en: "helpful" }, { zh: "總統", en: "president" }
+    ];
+    
+    const allWords = questionsData.map(q => q.en);
+    const MAX_LIVES = 3;
+    const ROCK_SPEED = 7;
+    const HORIZON_Y_PCT = 35;
+
+    // Lengths are world metres; turn is the total heading change in radians.
+    const ROAD_SEGMENTS = [
+      { type:'straight', label:'長直線', length:1100, turn:0 },
+      { type:'gentle-left', label:'緩左彎', length:700, turn:-0.65 },
+      { type:'gentle-right', label:'緩右彎', length:700, turn:0.65 },
+      { type:'sharp-left', label:'急左彎', length:470, turn:-1.35 },
+      { type:'sharp-right', label:'急右彎', length:470, turn:1.35 },
+      { type:'s-bend', label:'S 型彎道', length:1000, turn:0 },
+      { type:'hairpin', label:'髮夾彎', length:640, turn:-Math.PI },
+      { type:'straight', label:'長直線', length:800, turn:0 },
+      { type:'hairpin', label:'髮夾彎', length:640, turn:Math.PI }
+    ];
+    const ROAD_SPEED = 95;
+    const ROAD_VIEW = 620;
+    const WAYPOINT_STEP = 10;
+    const roadPath = { points:[{s:0,x:0,z:0,heading:0}], segments:[], next:0 };
+    const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+
+    // Integrate a smooth curvature profile to build a persistent world-space route.
+    // Each new section starts at the preceding endpoint and tangent.
+    function extendRoad(distance) {
+      let tail = roadPath.points[roadPath.points.length-1];
+      while (tail.s < distance) {
+        const index = roadPath.next++ % ROAD_SEGMENTS.length;
+        const segment = ROAD_SEGMENTS[index];
+        const start = tail.s;
+        roadPath.segments.push({start,end:start+segment.length,index});
+        const count = Math.ceil(segment.length/WAYPOINT_STEP);
+        const step = segment.length/count;
+        for (let i=0;i<count;i++) {
+          const u=(i+0.5)/count;
+          const curvature = segment.type==='s-bend'
+            ? 0.005 * Math.sin(2*Math.PI*u) * Math.sin(Math.PI*u)
+            : segment.turn/segment.length * (1-Math.cos(2*Math.PI*u));
+          const heading=tail.heading+curvature*step;
+          const mid=(heading+tail.heading)/2;
+          tail={s:tail.s+step,x:tail.x+Math.sin(mid)*step,z:tail.z+Math.cos(mid)*step,heading};
+          roadPath.points.push(tail);
+        }
+      }
+    }
+
+    // Cubic Hermite spline: shared endpoint tangents guarantee C1 continuity.
+    function sampleRoad(distance) {
+      extendRoad(distance+WAYPOINT_STEP);
+      const points=roadPath.points;
+      let lo=0, hi=points.length-1;
+      while(hi-lo>1) { const mid=(lo+hi)>>1; if(points[mid].s<=distance) lo=mid; else hi=mid; }
+      const a=points[lo], b=points[hi], span=b.s-a.s;
+      const t=clamp((distance-a.s)/span,0,1), t2=t*t, t3=t2*t;
+      const h0=2*t3-3*t2+1,h1=t3-2*t2+t,h2=-2*t3+3*t2,h3=t3-t2;
+      return {
+        x:h0*a.x+h1*span*Math.sin(a.heading)+h2*b.x+h3*span*Math.sin(b.heading),
+        z:h0*a.z+h1*span*Math.cos(a.heading)+h2*b.z+h3*span*Math.cos(b.heading),
+        heading:a.heading+(b.heading-a.heading)*t
+      };
+    }
+
+    // 遊戲邊界
+    const BOUNDS_X_MIN = 14;
+    const BOUNDS_X_MAX = 86;
+    const BOUNDS_Y_MIN = 8;
+    const BOUNDS_Y_MAX = 22; // Short grounded fore/aft travel, well below the horizon.
+
+    const LANES = [20, 50, 80];
+
+    const CAR_IMAGES = ['play1.png', 'play2.png', 'play3.png', 'play4.png', 'play5.png'];
+    // Warm the sprite cache so a late image load cannot reveal a car mid-road.
+    const trafficSprites = CAR_IMAGES.map(src => new Promise(resolve => {
+      const img = new Image();
+      img.onload = img.onerror = () => resolve();
+      img.src = src;
+    }));
+    const FALLBACK_COLORS = ['bg-gray-500', 'bg-slate-600', 'bg-zinc-500', 'bg-blue-800', 'bg-red-800'];
+
+    let gameState = {
+      queue: [],
+      currentIdx: 0,
+      correctCount: 0,
+      mistakes: 0,
+      isRunning: false,
+      gameLoop: null,
+      spawnerLoop: null,
+      lateralVelocity: 0,
+      targetPlayerX: null,
+      playerX: 50, 
+      playerY: 10,
+      targetPlayerY: 10,
+      lastHitTime: 0,
+      lastPlayerX: 50,
+      currentTilt: 0,
+      roadCurve: 0,
+      targetRoadCurve: 0,
+      roadSegmentIdx: 0,
+      roadDistance: 0,
+      lastFrame: 0,
+      frameStep: 1,
+      speedMultiplier: 1,
+      pointerForward: false,
+      runId: 0,
+    };
+
+    let keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false };
+    
+    const WORD_SPAWN_INTERVAL = 10000;
+    let wordSpawnInterval = WORD_SPAWN_INTERVAL;
+    let lastWordTime = 0;
+    let lastRockTime = 0;
+    let lastHealthStarTime = 0;
+    const HEALTH_STAR_COOLDOWN = 12000;
+
+    const ui = {
+      startScreen: document.getElementById('startScreen'),
+      questionArea: document.getElementById('questionArea'),
+      resultScreen: document.getElementById('resultScreen'),
+      qText: document.getElementById('qText'),
+      feedback: document.getElementById('feedback'),
+      correctCountDisplay: document.getElementById('correctCountDisplay'),
+      progressBar: document.getElementById('progressBar'),
+      progressText: document.getElementById('progressText'),
+      healthBar: document.getElementById('healthBar'),
+      resultTitle: document.getElementById('resultTitle'),
+      resultDesc: document.getElementById('resultDesc'),
+      resultEmoji: document.getElementById('resultEmoji'),
+      
+      trackPanel: document.getElementById('trackPanel'),
+      playerCar: document.getElementById('playerCar'),
+      gameEntities: document.getElementById('gameEntities'),
+      inputLayer: document.getElementById('inputLayer'),
+      roadContainer: document.getElementById('roadContainer'),
+      curveGuide: document.getElementById('curveGuide')
+    };
+
+    function shuffle(arr) { return arr.sort(() => Math.random() - 0.5); }
+
+    /* --- 操控輸入處理 --- */
+    let activePointer = null;
+    ui.trackPanel.addEventListener('pointerdown', (e) => {
+      if (!gameState.isRunning || activePointer !== null || !e.isPrimary || e.button !== 0) return;
+      activePointer = e.pointerId;
+      ui.trackPanel.setPointerCapture(e.pointerId);
+      handleInputMove(e.clientX, e.clientY);
+      e.preventDefault();
+    });
+    ui.trackPanel.addEventListener('pointermove', (e) => {
+      if (!gameState.isRunning) return;
+      if (activePointer !== null ? e.pointerId !== activePointer : e.pointerType !== 'mouse') return;
+      handleInputMove(e.clientX, e.clientY);
+    });
+    function releasePointer(e) {
+      if (e.pointerId !== activePointer) return;
+      activePointer = null;
+      gameState.pointerForward=false;
+      gameState.targetPlayerX=null;
+      if (ui.trackPanel.hasPointerCapture(e.pointerId)) ui.trackPanel.releasePointerCapture(e.pointerId);
+    }
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type =>
+      ui.trackPanel.addEventListener(type, releasePointer));
+    function resetInput() {
+      gameState.pointerForward=false;
+      gameState.lateralVelocity=0;gameState.targetPlayerX=null;
+      Object.keys(keys).forEach(key => keys[key] = false);
+      if (activePointer !== null) releasePointer({pointerId: activePointer});
+    }
+    window.addEventListener('blur', resetInput);
+    document.addEventListener('visibilitychange', () => {
+      resetInput();
+      gameState.lastFrame = performance.now();
+    });
+
+    function handleInputMove(clientX, clientY) {
+      const rect = ui.trackPanel.getBoundingClientRect();
+      
+      let rawX = (clientX - rect.left) / rect.width * 100;
+      let rawY = (1 - (clientY - rect.top) / rect.height) * 100;
+
+      let targetX = Math.max(BOUNDS_X_MIN, Math.min(rawX, BOUNDS_X_MAX));
+      let targetY = Math.max(BOUNDS_Y_MIN, Math.min(rawY, BOUNDS_Y_MAX));
+
+      gameState.targetPlayerX = targetX;
+      gameState.targetPlayerY = targetY;
+      gameState.pointerForward = activePointer !== null && rawY >= 18;
+      
+      constrainPlayer();
+      renderPlayer();
+    }
+
+    // Track-width percent per second; integrate in small time steps for all refresh rates.
+    const STEER_MAX_SPEED = 32;
+    const STEER_ACCEL = 90;
+    const STEER_BRAKE = 130;
+    function updateSteering(dt) {
+      while (dt > 0.000001) {
+        const step=Math.min(dt,1/120);dt-=step;
+        const input=Number(keys.ArrowRight)-Number(keys.ArrowLeft);
+        const hasKeyboard=keys.ArrowRight||keys.ArrowLeft;
+        if(hasKeyboard) gameState.targetPlayerX=null;
+        const error=gameState.targetPlayerX===null ? 0 : gameState.targetPlayerX-gameState.playerX;
+        const desired=hasKeyboard ? input*STEER_MAX_SPEED : clamp(error*5,-STEER_MAX_SPEED,STEER_MAX_SPEED);
+        const old=gameState.lateralVelocity;
+        const braking=old*desired<0 || Math.abs(desired)<Math.abs(old);
+        gameState.lateralVelocity+=clamp(desired-old,-(braking?STEER_BRAKE:STEER_ACCEL)*step,(braking?STEER_BRAKE:STEER_ACCEL)*step);
+        gameState.playerX+=(old+gameState.lateralVelocity)*0.5*step;
+        if(gameState.targetPlayerX!==null && Math.abs(error)<0.04 && Math.abs(gameState.lateralVelocity)<0.3) {
+          gameState.targetPlayerX=null;
+          gameState.lateralVelocity=0;
+        }
+      }
+    }
+    const KEY_SPEED_Y = 1.5;
+    
+    document.addEventListener('keydown', (e) => {
+      if (keys.hasOwnProperty(e.key) && gameState.isRunning) { e.preventDefault(); keys[e.key] = true; }
+    });
+    document.addEventListener('keyup', (e) => {
+      if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
+    });
+
+    // --- 遊戲流程 ---
+    function startGame() {
+      resetInput();
+      gameState.queue = shuffle([...questionsData]);
+      gameState.currentIdx = 0;
+      gameState.correctCount = 0;
+      gameState.mistakes = 0;
+      gameState.isRunning = true;
+      gameState.playerX = 50;
+      gameState.lateralVelocity = 0;
+      gameState.targetPlayerX = null;
+      gameState.playerY = 10;
+      gameState.targetPlayerY = 10;
+      gameState.speedMultiplier = 1;
+      document.getElementById('speedStatus').textContent = '巡航';
+      document.getElementById('slopeStatus').textContent = '平緩路段';
+      gameState.lastPlayerX = 50;
+      gameState.currentTilt = 0;
+      gameState.lastHitTime = 0;
+      gameState.roadCurve = 0;
+      gameState.targetRoadCurve = 0;
+      gameState.roadSegmentIdx = 0;
+      roadPath.points=[{s:0,x:0,z:0,heading:0}];
+      roadPath.segments=[]; roadPath.next=0;
+      gameState.roadDistance = 0;
+      gameState.lastFrame = performance.now();
+      gameState.runId++;
+      lastWordTime = Date.now();
+      wordSpawnInterval = WORD_SPAWN_INTERVAL + Math.floor(Math.random()*2)*1000;
+      lastRockTime = 0;
+      lastHealthStarTime = Date.now();
+      applyRoadVisuals();
+
+      ui.correctCountDisplay.innerText = "0";
+      ui.progressBar.style.width = "0%";
+      ui.progressText.innerText = "0%";
+      updateHearts();
+      
+      ui.startScreen.classList.add('hidden');
+      ui.resultScreen.classList.add('hidden');
+      ui.questionArea.classList.remove('hidden');
+      ui.trackPanel.style.cursor = 'none';
+
+      ui.gameEntities.innerHTML = "";
+      ui.playerCar.classList.remove('player-hit');
+      ui.playerCar.style.transform = 'translateX(-50%)';
+      ui.playerCar.style.left = '50%';
+      ui.playerCar.style.bottom = '10%';
+      renderPlayer();
+      
+      if (gameState.gameLoop) cancelAnimationFrame(gameState.gameLoop);
+      if (gameState.spawnerLoop) clearInterval(gameState.spawnerLoop);
+
+      gameState.spawnerLoop = setInterval(spawnManager, 1000); 
+      gameState.gameLoop = requestAnimationFrame(updateGame);
+
+      showNextQuestion();
+    }
+
+    function updateHearts() {
+      ui.healthBar.innerHTML = "";
+      const remaining = MAX_LIVES - gameState.mistakes;
+      for (let i = 0; i < MAX_LIVES; i++) {
+        const span = document.createElement('span');
+        span.className = `heart ${i < remaining ? '' : 'lost'}`;
+        span.innerText = i < remaining ? '❤️' : '💀'; 
+        ui.healthBar.appendChild(span);
+      }
+    }
+
+    function showNextQuestion() {
+      if (gameState.currentIdx >= gameState.queue.length) {
+        endGame(true);
+        return;
+      }
+      const q = gameState.queue[gameState.currentIdx];
+      ui.qText.innerText = q.zh;
+      ui.feedback.innerText = "";
+
+      
+      const pct = Math.round((gameState.currentIdx / gameState.queue.length) * 100);
+      ui.progressBar.style.width = `${pct}%`;
+      ui.progressText.innerText = `${pct}%`;
+    }
+
+    function updateRoad(now) {
+      const dt=clamp((now-gameState.lastFrame)/1000,0,0.05);
+      gameState.lastFrame=now;
+      gameState.frameStep=dt*60;
+      const accelerating = !keys.ArrowDown && (keys.ArrowUp || gameState.pointerForward);
+      const targetSpeed = accelerating ? 3 : 1;
+      gameState.speedMultiplier += (targetSpeed-gameState.speedMultiplier)*(1-Math.exp(-(accelerating ? 6 : 4)*dt));
+      const travelSpeed = ROAD_SPEED*gameState.speedMultiplier;
+      gameState.roadDistance+=travelSpeed*dt;
+      document.getElementById('speedStatus').textContent =
+        gameState.speedMultiplier > 1.05 ? '加速 ×'+gameState.speedMultiplier.toFixed(1) : '巡航';
+
+      const grade=roadGrade(gameState.roadDistance);
+      document.getElementById('slopeStatus').textContent=Math.abs(grade)<0.04
+        ? '坡頂／谷底' : (grade>0 ? '陡上坡 ' : '陡下坡 ')+Math.round(Math.abs(grade)*100)+'%';
+      const d=gameState.roadDistance;
+      const here=sampleRoad(d), ahead=sampleRoad(d+12);
+      gameState.roadCurve=(ahead.heading-here.heading)/12;
+      const segment=roadPath.segments.find(seg=>d>=seg.start && d<seg.end);
+      if(segment) gameState.roadSegmentIdx=segment.index;
+      // Positive turn bends right; inertia pushes the player left.
+      gameState.playerX-=gameState.roadCurve*travelSpeed*dt*16;
+      applyRoadVisuals();
+      // Keep an endless drive bounded in memory while retaining spline neighbours.
+      if(roadPath.points.length>3000) {
+        const first=roadPath.points.findIndex(p=>p.s>=d-30);
+        if(first>1) roadPath.points.splice(0,first-1);
+        roadPath.segments=roadPath.segments.filter(seg=>seg.end>d-30);
+      }
+    }
+
+    // Arcade ribbon projection: depth uses distance along the spline so a 180°
+    // hairpin remains playable. Lateral displacement uses actual world waypoints.
+    // Continuous mountain elevation: alternating steep climbs and descents.
+    function roadElevation(distance) {
+      return 108.8*(1-Math.cos(distance/340));
+    }
+    function roadGrade(distance) { return 0.32*Math.sin(distance/340); }
+    function slopeProjection() {
+      const grade=roadGrade(gameState.roadDistance);
+      const aheadGrade=(roadElevation(gameState.roadDistance+ROAD_VIEW)-
+        roadElevation(gameState.roadDistance))/ROAD_VIEW;
+      return {horizon:0.35-grade*0.45,
+        bend:clamp((aheadGrade-grade)*1.4,-0.42,0.42)};
+    }
+    function roadScreenY(progress) {
+      const {horizon,bend}=slopeProjection();
+      return ui.trackPanel.clientHeight*(horizon+(1-horizon)*
+        (progress+bend*progress*(1-progress)));
+    }
+    // Invert the same projection for steering, road bounds and collision placement.
+    function roadProgressAtY(y) {
+      const {horizon,bend}=slopeProjection();
+      const v=(y/ui.trackPanel.clientHeight-horizon)/(1-horizon);
+      return 2*v/(1+bend+Math.sqrt(Math.max(0.001,(1+bend)**2-4*bend*v)));
+    }
+    function roadFrame(progress) {
+      const p=clamp(progress,0,1);
+      const depth=ROAD_VIEW*(1-p);
+      const camera=sampleRoad(gameState.roadDistance);
+      const point=sampleRoad(gameState.roadDistance+depth);
+      const lateral=(point.x-camera.x)*Math.cos(camera.heading)-(point.z-camera.z)*Math.sin(camera.heading);
+      const half=6+38*p;
+      const room=48-half;
+      const center=50+room*Math.tanh(lateral/150);
+      return {center,half,left:center-half,right:center+half,depth};
+    }
+    function roadCenterAtProgress(progress) { return roadFrame(progress).center; }
+    function laneXOnRoad(laneBase, progress) {
+      const r=roadFrame(progress);
+      return r.center+(clamp(laneBase,0,100)-50)/50*r.half;
+    }
+
+    function applyRoadVisuals() {
+      const canvas=document.getElementById('roadCanvas'), ctx=canvas.getContext('2d');
+      const w=ui.trackPanel.clientWidth,h=ui.trackPanel.clientHeight;
+      const dpr=Math.min(window.devicePixelRatio||1,2);
+      if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)) {canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);}
+      ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+      const rows=100, horizon=roadScreenY(0);
+      const sky=ctx.createLinearGradient(0,0,0,horizon);
+      sky.addColorStop(0,'#3b82f6');sky.addColorStop(1,'#c9e5f4');
+      ctx.fillStyle=sky;ctx.fillRect(0,0,w,horizon);
+      // Distant ridges move with camera pitch as the road climbs and descends.
+      ctx.fillStyle='#657b78';ctx.beginPath();ctx.moveTo(0,horizon);
+      for(let i=0;i<=12;i++) ctx.lineTo(w*i/12,horizon-h*(0.025+0.05*(1+Math.sin(i*2.3))/2));
+      ctx.lineTo(w,horizon);ctx.closePath();ctx.fill();
+      function quad(a,b,left,right,color) {
+        ctx.fillStyle=color; ctx.beginPath();
+        ctx.moveTo((a.center+a.half*left)*w/100,a.y);
+        ctx.lineTo((a.center+a.half*right)*w/100,a.y);
+        ctx.lineTo((b.center+b.half*right)*w/100,b.y);
+        ctx.lineTo((b.center+b.half*left)*w/100,b.y);ctx.closePath();ctx.fill();
+      }
+      for(let i=0;i<rows;i++) {
+        const p=i/rows,q=(i+1)/rows;
+        const a={...roadFrame(p),y:roadScreenY(p)};
+        const b={...roadFrame(q),y:roadScreenY(q)+0.5};
+        const stripe=Math.floor((gameState.roadDistance+a.depth)/20)%2;
+        // Mountain shoulders follow the exact same ribbon boundaries.
+        ctx.fillStyle=stripe?'#454b3c':'#484e3e';
+        ctx.beginPath();ctx.moveTo(0,a.y);ctx.lineTo(a.left*w/100,a.y);ctx.lineTo(b.left*w/100,b.y);ctx.lineTo(0,b.y);ctx.fill();
+        ctx.fillStyle=stripe?'#615b4c':'#655f50';
+        ctx.beginPath();ctx.moveTo(a.right*w/100,a.y);ctx.lineTo(w,a.y);ctx.lineTo(w,b.y);ctx.lineTo(b.right*w/100,b.y);ctx.fill();
+        quad(a,b,-1.1,1.1,'#615b4b');
+        quad(a,b,-1,1,stripe?'#34373c':'#36393e');
+        quad(a,b,-1,-0.975,stripe?'#f3eee3':'#c74735');
+        quad(a,b,0.975,1,stripe?'#f3eee3':'#c74735');
+        quad(a,b,-0.015,0.015,'#e7b44e');
+        if(stripe) {quad(a,b,-0.345,-0.33,'#bfc3bc');quad(a,b,0.33,0.345,'#bfc3bc');}
+      }
+      if(ui.curveGuide) ui.curveGuide.textContent=ROAD_SEGMENTS[gameState.roadSegmentIdx].label;
+    }
+
+    // Constrain the entire visible bounding box across its vertical footprint,
+    // rather than just its centre. This includes long words and tilted cars.
+    function fitOnRoad(el, desired, scale=1, tilt=0, player=false) {
+      const w=ui.trackPanel.clientWidth,h=ui.trackPanel.clientHeight;
+      const angle=Math.abs(tilt)*Math.PI/180;
+      const bw=(el.offsetWidth*Math.cos(angle)+el.offsetHeight*Math.sin(angle))*scale;
+      const bh=(el.offsetHeight*Math.cos(angle)+el.offsetWidth*Math.sin(angle))*scale;
+      const pivot=player ? h*(1-gameState.playerY/100) : parseFloat(el.dataset.top)+el.offsetHeight;
+      const offsetX=Math.sin(tilt*Math.PI/180)*el.offsetHeight*scale/2;
+      const bottom=pivot-Math.cos(angle)*el.offsetHeight*scale/2+bh/2;
+      let left=0,right=100;
+      for(let i=0;i<=8;i++) {
+        const y=bottom-bh+bh*i/8;
+        const r=roadFrame(roadProgressAtY(y));
+        left=Math.max(left,r.left+bw/w*50+0.5);right=Math.min(right,r.right-bw/w*50-0.5);
+      }
+      left-=offsetX/w*100;right-=offsetX/w*100;
+      return {x:left<=right?clamp(desired,left,right):(left+right)/2, fits:left<=right};
+    }
+    function constrainPlayer() {
+      gameState.playerY=clamp(gameState.playerY,BOUNDS_Y_MIN,BOUNDS_Y_MAX);
+      const before=gameState.playerX;
+      gameState.playerX=fitOnRoad(ui.playerCar,clamp(gameState.playerX,BOUNDS_X_MIN,BOUNDS_X_MAX),playerScale(),gameState.currentTilt,true).x;
+      if((before-gameState.playerX)*gameState.lateralVelocity>0) {
+        gameState.lateralVelocity=0;
+        gameState.targetPlayerX=null;
+      }
+    }
+
+    function playerProgress() {
+      return roadProgressAtY(ui.trackPanel.clientHeight*(1-gameState.playerY/100));
+    }
+    function playerScale() {
+      return roadFrame(playerProgress()).half/roadFrame((0.9-0.35)/0.65).half;
+    }
+    function playerRoadAngle() {
+      const p=playerProgress(), r=roadFrame(p);
+      const lane=clamp(50+(gameState.playerX-r.center)/r.half*50,0,100);
+      const dx=(laneXOnRoad(lane,p-0.025)-laneXOnRoad(lane,p))*ui.trackPanel.clientWidth/100;
+      const dy=roadScreenY(p)-roadScreenY(p-0.025);
+      return Math.atan2(dx,dy)*180/Math.PI;
+    }
+    function renderPlayer() {
+      const el=ui.playerCar;
+      el.style.left=gameState.playerX+'%';
+      el.style.bottom=gameState.playerY+'%';
+      el.style.transform=`translateX(-50%) rotate(${gameState.currentTilt}deg) scale(${playerScale()})`;
+      el.style.zIndex=Math.floor(playerProgress()*5000);
+    }
+
+    // --- 遊戲主迴圈 ---
+    function updateGame(now) {
+      if (!gameState.isRunning) return;
+      if (document.hidden) { gameState.lastFrame = performance.now(); gameState.gameLoop = requestAnimationFrame(updateGame); return; }
+
+      updateRoad(now || performance.now());
+
+      updateSteering(gameState.frameStep/60);
+      if (keys.ArrowUp) gameState.targetPlayerY += KEY_SPEED_Y * 0.3 * gameState.frameStep;
+      if (keys.ArrowDown) gameState.targetPlayerY -= KEY_SPEED_Y * 0.3 * gameState.frameStep;
+      gameState.targetPlayerY=clamp(gameState.targetPlayerY,BOUNDS_Y_MIN,BOUNDS_Y_MAX);
+      gameState.playerY+=(gameState.targetPlayerY-gameState.playerY)*(1-Math.exp(-0.12*gameState.frameStep));
+
+
+      if (gameState.playerY < BOUNDS_Y_MIN) gameState.playerY = BOUNDS_Y_MIN;
+      if (gameState.playerY > BOUNDS_Y_MAX) gameState.playerY = BOUNDS_Y_MAX;
+
+      ui.playerCar.style.left = gameState.playerX + '%';
+      ui.playerCar.style.bottom = gameState.playerY + '%';
+
+      constrainPlayer();
+      ui.playerCar.style.left = gameState.playerX + '%';
+      // 計算移動量
+      const deltaX = gameState.playerX - gameState.lastPlayerX;
+      
+      // Follow the projected lane tangent, with a small steering slip angle.
+      const steering=clamp(deltaX/Math.max(gameState.frameStep,0.1)*2,-8,8);
+      const targetTilt=clamp(playerRoadAngle()+steering,-48,48);
+      gameState.currentTilt+=(targetTilt-gameState.currentTilt)*(1-Math.exp(-0.2*gameState.frameStep));
+      constrainPlayer();
+      renderPlayer();
+
+      if (Math.abs(deltaX) > 0.5) {
+        spawnSmoke(gameState.playerX, gameState.playerY);
+      }
+
+      gameState.lastPlayerX = gameState.playerX;
+
+      updateEntities();
+
+      gameState.gameLoop = requestAnimationFrame(updateGame);
+    }
+
+    function spawnSmoke(xPct, yPct) {
+      if (Math.random() > 0.3) return; 
+
+      const carEl = ui.playerCar;
+      const trackEl = ui.trackPanel;
+      
+      const carRect = carEl.getBoundingClientRect();
+      const trackRect = trackEl.getBoundingClientRect();
+      
+      createSmokeParticle(carRect.left + 8 - trackRect.left, carRect.bottom - 10 - trackRect.top);
+      createSmokeParticle(carRect.right - 12 - trackRect.left, carRect.bottom - 10 - trackRect.top);
+    }
+
+    function createSmokeParticle(left, top) {
+      const smoke = document.createElement('div');
+      smoke.className = 'smoke-particle';
+      smoke.style.left = left + 'px';
+      smoke.style.top = top + 'px';
+      
+      ui.trackPanel.appendChild(smoke);
+      
+      setTimeout(() => {
+        smoke.remove();
+      }, 600);
+    }
+
+    function emitTrafficSmoke(el, scale, tilt, dt) {
+      if(el.dataset.hit==='true' || Number(el.style.opacity)<0.15 || scale<0.16) return;
+      const interval=0.12/clamp(Number(el.dataset.currentTrafficSpeed||45)/45,1,2);
+      const elapsed=Number(el.dataset.smokeElapsed||0)+dt;
+      el.dataset.smokeElapsed=elapsed;
+      if(elapsed<interval) return;
+      el.dataset.smokeElapsed=elapsed%interval;
+      if(ui.gameEntities.querySelectorAll('.enemy-smoke').length>78) return;
+      const rect=el.getBoundingClientRect(), panel=ui.trackPanel.getBoundingClientRect();
+      const angle=tilt*Math.PI/180, sin=Math.sin(angle), cos=Math.cos(angle);
+      const cx=(rect.left+rect.right)/2-panel.left, cy=(rect.top+rect.bottom)/2-panel.top;
+      const localY=-el.offsetHeight*scale*0.34;
+      for(const side of [-1,1]) {
+        const localX=side*el.offsetWidth*scale*0.17;
+        const smoke=document.createElement('div');
+        smoke.className='enemy-smoke';
+        smoke.setAttribute('aria-hidden','true');
+        const size=Math.max(3,11*scale);
+        smoke.style.width=smoke.style.height=size+'px';
+        smoke.style.left=(cx+localX*cos-localY*sin)+'px';
+        smoke.style.top=(cy+localX*sin+localY*cos)+'px';
+        smoke.style.zIndex=Math.max(19,Number(el.style.zIndex)-1);
+        ui.gameEntities.appendChild(smoke);
+        const trail=(20+Math.random()*12)*scale;
+        const drift=(Math.random()-0.5)*12*scale;
+        const animation=smoke.animate([
+          {transform:'translate(-50%,-50%) scale(0.65)',opacity:0.5*Number(el.style.opacity)},
+          {transform:`translate(calc(-50% + ${sin*trail+drift}px),calc(-50% - ${cos*trail}px)) scale(2.5)`,opacity:0}
+        ],{duration:650,easing:'ease-out',fill:'forwards'});
+        animation.onfinish=animation.oncancel=()=>smoke.remove();
+      }
+    }
+
+    // Opposing traffic moves toward the player in world space, independently of camera speed.
+    function trafficSpeed(el) {
+      const baseSpeed = Number(el.dataset.trafficSpeed || 45);
+      return baseSpeed * (1 + 0.10 * clamp(gameState.correctCount, 0, gameState.queue.length));
+    }
+
+    function initTrafficSteering(el, lane) {
+      el.dataset.weavePhase=Math.asin(clamp((lane-50)/34,-1,1));
+      if(Math.random()<0.5) el.dataset.weavePhase=Math.PI-Number(el.dataset.weavePhase);
+      el.dataset.weaveRate=0.95+Math.random()*0.55;
+      el.dataset.weaveAmplitude=27+Math.random()*7;
+      el.dataset.steerAge=0;
+      el.dataset.laneVelocity=0;
+      el.dataset.trafficTilt=0;
+    }
+    function updateTrafficSteering(el, dt, progress) {
+      const frameDt=dt;
+      if(el.dataset.steerAge===undefined) initTrafficSteering(el,Number(el.dataset.baseLane||50));
+      let age=Number(el.dataset.steerAge);
+      let lane=Number(el.dataset.baseLane), velocity=Number(el.dataset.laneVelocity);
+      const rate=Number(el.dataset.weaveRate), phase=Number(el.dataset.weavePhase);
+      // Time-based acceleration gives each driver a distinct flowing path, without teleports.
+      while(dt>0.000001) {
+        const step=Math.min(dt,1/120);dt-=step;age+=step;
+        const target=clamp(50+Number(el.dataset.weaveAmplitude)*Math.sin(age*rate+phase)+
+          4*Math.sin(age*rate*1.9+phase),16,84);
+        // Ease out lane changes close to the player rather than cutting across at the last instant.
+        const room=1-0.8*clamp((progress-0.72)/0.25,0,1);
+        const desired=clamp((target-lane)*2.4,-24,24)*room;
+        const before=velocity;
+        velocity+=clamp(desired-velocity,-65*step,65*step);
+        lane=clamp(lane+(before+velocity)*0.5*step,15,85);
+      }
+      el.dataset.steerAge=age;
+      el.dataset.laneVelocity=velocity;
+      el.dataset.baseLane=lane;
+      const ahead=progress+0.015;
+      const dx=(laneXOnRoad(lane,ahead)-laneXOnRoad(lane,progress))*ui.trackPanel.clientWidth/100;
+      const dy=roadScreenY(ahead)-roadScreenY(progress);
+      const heading=-Math.atan2(dx,Math.max(1,dy))*180/Math.PI;
+      const targetTilt=clamp(heading-velocity*0.5,-32,32);
+      el.dataset.trafficTilt=Number(el.dataset.trafficTilt)+
+        (targetTilt-Number(el.dataset.trafficTilt))*(1-Math.exp(-7*frameDt));
+    }
+
+    // 更新所有實體的位置與縮放
+    function updateEntities() {
+      const entities = document.querySelectorAll('.game-object:not(#playerCar)');
+      const playerRect = ui.playerCar.getBoundingClientRect();
+      const pRect = {
+        left: playerRect.left + 8, 
+        right: playerRect.right - 8,
+        top: playerRect.top + 8,
+        bottom: playerRect.bottom - 8
+      };
+
+      const horizonY = roadScreenY(0);
+
+      entities.forEach(el => {
+        // Warning stays at the horizon but follows the current road bend.
+        if (el.dataset.type === 'warning') {
+          el.style.top=roadScreenY(0)+'px';
+          const warningLane = parseFloat(el.dataset.baseLane || el.style.left || 50);
+          el.style.left = fitOnRoad(el,laneXOnRoad(warningLane,0),0.45).x + '%';
+          return;
+        }
+
+        let top = parseFloat(el.dataset.top || -150);
+        let speed = parseFloat(el.dataset.speed || 0.5);
+        
+        if (!el.dataset.distance) el.dataset.distance=gameState.roadDistance+ROAD_VIEW*(1-clamp(roadProgressAtY(top),0,1));
+        const isRock=el.dataset.type==='rock';
+        // Grounded rocks are fixed world obstacles; only the camera approaches them.
+        if(el.dataset.type === 'car') {
+          const dt=gameState.frameStep/60;
+          const target=trafficSpeed(el);
+          const current=Number(el.dataset.currentTrafficSpeed || target);
+          // Smooth acceleration, including vehicles already on the road after an answer.
+          const decay=Math.exp(-2.5*dt);
+          const travel=target*dt+(current-target)*(1-decay)/2.5;
+          el.dataset.currentTrafficSpeed=target+(current-target)*decay;
+          el.dataset.distance=Number(el.dataset.distance)-travel;
+        } else if(!isRock) {
+          el.dataset.distance=Number(el.dataset.distance)+(ROAD_SPEED-speed*12)*gameState.frameStep/60;
+        }
+        if(isRock) updateRockMotion(el,gameState.frameStep/60);
+        let progress=1-(parseFloat(el.dataset.distance)-gameState.roadDistance)/ROAD_VIEW;
+        if(el.dataset.type === 'car' && progress < 0) {
+          el.style.opacity='0';
+          el.style.visibility='hidden';
+          return;
+        }
+        el.style.visibility='visible';
+        top=roadScreenY(progress)-el.offsetHeight;
+        if(progress>1.15) {el.remove();return;}
+
+        if (el.dataset.baseLane) {
+          const baseLane = parseFloat(el.dataset.baseLane);
+          el.style.left = laneXOnRoad(baseLane, progress) + '%';
+        }
+        
+ 
+
+        if (el.dataset.type === 'car') {
+          updateTrafficSteering(el,gameState.frameStep/60,progress);
+        }
+        const entityTilt=el.dataset.type === 'car' ? Number(el.dataset.trafficTilt||0) : 0;
+
+        // Position comes from longitudinal world distance, shared with the road.
+        el.dataset.top = top;
+        el.style.top = top + 'px';
+
+        // --- 關鍵修改：透視縮放與層級 ---
+        // [修改] 調整縮放係數 (1.25)，使敵車接近玩家(progress約0.8)時大小精確為1.0，視覺更和諧
+        let scale = 0.1 + (progress * 1.25); 
+        
+        if (el.dataset.type === 'word') {
+             scale = 0.2 + (progress * 1.2); 
+        }
+
+        if(isRock) scale=roadFrame(progress).half/roadFrame(0.85).half;
+        if (scale < 0) scale = 0;
+        
+        let fit=fitOnRoad(el,laneXOnRoad(parseFloat(el.dataset.baseLane||50),progress),scale,entityTilt);
+        while(!fit.fits && scale>0.03) {scale*=0.9;fit=fitOnRoad(el,laneXOnRoad(parseFloat(el.dataset.baseLane||50),progress),scale,entityTilt);}
+        // Airborne stones enter from beyond the shoulder; grounded stones fit the road.
+        const rockLane=Number(el.dataset.baseLane);
+        const rockFrame=roadFrame(progress);
+        el.style.left=(isRock && Number(el.dataset.age)<0.72
+          ? rockFrame.center+(rockLane-50)/50*rockFrame.half : fit.x)+'%';
+        el.style.transform = `translateX(-50%) rotate(${entityTilt}deg) scale(${scale})`;
+        
+        const reveal=clamp(progress/(el.dataset.type === 'car' ? 0.22 : 0.15),0,1);
+        el.style.opacity=el.dataset.type === 'car' ? reveal*reveal*(3-2*reveal) : reveal;
+
+        // [修改] 大幅增加 Z-index 範圍，讓敵車可以正確遮擋或被遮擋
+        el.style.zIndex = Math.max(20,Math.floor(progress * 5000));
+
+        if (el.dataset.type === 'car') {
+          emitTrafficSmoke(el,scale,entityTilt,gameState.frameStep/60);
+        }
+
+        if (top > ui.trackPanel.clientHeight) {
+          el.remove();
+          return;
+        }
+
+        if (el.dataset.hit === 'true' || (isRock && Number(el.dataset.age)<1.32)) return;
+
+        const eRect = (isRock ? el.querySelector('.rock-body') : el).getBoundingClientRect();
+        const hitMargin = (isRock ? 3 : 15) * scale; 
+        
+        const collided = el.dataset.type === 'car'
+          ? carBodiesOverlap(carHitbox(ui.playerCar, playerScale(), gameState.currentTilt),
+              carHitbox(el, scale, entityTilt))
+          : isRock
+            ? carBodiesOverlap(carHitbox(ui.playerCar, playerScale(), gameState.currentTilt),
+                rockHitbox(el, scale))
+            : overlapsObstacle(pRect, eRect, hitMargin);
+        if (collided) {
+          handleCollision(el);
+        }
+      });
+    }
+
+    // Use narrow oriented body cores, excluding image padding, mirrors and bumpers.
+    function carHitbox(el, scale, angle) {
+      const rect = el.getBoundingClientRect();
+      const radians = angle * Math.PI / 180;
+      return {
+        x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2,
+        halfWidth: el.offsetWidth * scale * 0.18,
+        halfHeight: el.offsetHeight * scale * 0.27,
+        axes: [{x: Math.cos(radians), y: Math.sin(radians)},
+          {x: -Math.sin(radians), y: Math.cos(radians)}]
+      };
+    }
+    function rockHitbox(el, scale) {
+      const body = el.querySelector('.rock-body');
+      const rect = body.getBoundingClientRect();
+      return {
+        x:(rect.left+rect.right)/2, y:(rect.top+rect.bottom)/2,
+        // A small core inside the irregular rock; shadow and dust never collide.
+        halfWidth:Math.min(body.offsetWidth,body.offsetHeight)*scale*0.22,
+        halfHeight:Math.min(body.offsetWidth,body.offsetHeight)*scale*0.22,
+        axes:[{x:1,y:0},{x:0,y:1}]
+      };
+    }
+    function carBodiesOverlap(a, b) {
+      if (a.halfWidth <= 0 || b.halfWidth <= 0) return false;
+      const dot = (u,v) => u.x*v.x + u.y*v.y;
+      const radius = (box,axis) => box.halfWidth*Math.abs(dot(box.axes[0],axis)) +
+        box.halfHeight*Math.abs(dot(box.axes[1],axis));
+      const delta = {x:b.x-a.x, y:b.y-a.y};
+      return [...a.axes,...b.axes].every(axis =>
+        Math.abs(dot(delta,axis)) < radius(a,axis)+radius(b,axis));
+    }
+
+    // Pickups retain their existing overlap rules.
+    function overlapsObstacle(player, obstacle, margin, clearance = 0) {
+      const gapX = Math.min(clearance, (player.right - player.left) * 0.3);
+      const gapY = Math.min(clearance, (player.bottom - player.top) * 0.3);
+      return player.left + gapX < obstacle.right - margin &&
+        player.right - gapX > obstacle.left + margin &&
+        player.top + gapY < obstacle.bottom - margin &&
+        player.bottom - gapY > obstacle.top + margin;
+    }
+
+    function updateRockMotion(rock,dt) {
+      const age=Number(rock.dataset.age)+dt;
+      rock.dataset.age=age;
+      const entry=Number(rock.dataset.entryLane), target=Number(rock.dataset.targetLane);
+      const fallTime=0.72, settleTime=1.32;
+      // Gravity accelerates the fall; horizontal momentum carries it off the mountain.
+      const flight=clamp(age/fallTime,0,1);
+      const landing=target+(entry<50?-7:7);
+      const roll=clamp((age-fallTime)/(settleTime-fallTime),0,1);
+      rock.dataset.baseLane=age<fallTime ? entry+(landing-entry)*flight
+        : landing+(target-landing)*(1-Math.pow(1-roll,3));
+      const unit=rock.offsetHeight/34;
+      let height=0;
+      if(age<fallTime) height=100*unit*(1-flight*flight);
+      else if(age<1.08) {const u=(age-fallTime)/0.36;height=4*15*unit*u*(1-u);}
+      else if(age<settleTime) {const u=(age-1.08)/0.24;height=4*5*unit*u*(1-u);}
+      rock.dataset.height=Math.max(0,height);
+      const spin=(entry<50?1:-1)*(age<fallTime ? -125+flight*155 : 30+60*(1-Math.pow(1-roll,2)));
+      rock.querySelector('.rock-body').style.transform=`translateY(${-height}px) rotate(${spin}deg)`;
+      const shadow=rock.querySelector('.rock-shadow');
+      shadow.style.opacity=0.75-0.5*clamp(height/(100*unit),0,1);
+      shadow.style.transform=`scale(${1+height/(100*unit)*0.5})`;
+      const dust=rock.querySelector('.rock-dust');
+      const impact=age-fallTime;
+      dust.style.opacity=impact>=0&&impact<0.6 ? 0.7*(1-impact/0.6) : 0;
+      dust.style.transform=`scale(${1+Math.max(0,impact)*2})`;
+    }
+
+    function spawnRock() {
+        const lane = LANES[Math.floor(Math.random() * LANES.length)];
+        const horizonY = roadScreenY(0);
+        
+        // 1. 生成預警標示 (納入 game-object 系統以便 isLaneFree 檢測)
+        const warning = document.createElement('div');
+        warning.className = 'game-object lane-warning rock-warning';
+        warning.hidden = true;
+      warning.style.display = 'none';
+      warning.setAttribute('aria-hidden','true');
+        warning.dataset.baseLane = lane;
+        warning.dataset.baseLane = lane;
+      warning.style.left = laneXOnRoad(lane, 0) + '%';
+      warning.style.top = horizonY + 'px';
+      warning.style.transform = 'translateX(-50%) scale(0.45)';
+        warning.dataset.top = horizonY; // 設定虛擬高度供檢測
+        warning.dataset.type = 'warning';
+        ui.gameEntities.appendChild(warning);
+
+        // 2. 延遲 1 秒後生成真正的落石
+        const runId=gameState.runId;
+        setTimeout(() => {
+            warning.remove();
+            if(runId!==gameState.runId) return;
+            if (!gameState.isRunning) return;
+
+            const rock = document.createElement('div');
+            rock.className = "game-object rock-obstacle";
+            rock.dataset.type = "rock";
+            rock.dataset.baseLane = lane;
+            rock.dataset.targetLane = lane;
+            rock.dataset.entryLane = lane<=50 ? -14 : 114;
+            rock.dataset.age = 0;
+            rock.dataset.height = 100;
+            rock.dataset.distance = gameState.roadDistance+ROAD_VIEW*0.64;
+            rock.dataset.top = roadScreenY(0.36)-34;
+            rock.innerHTML='<span class="rock-shadow"></span><span class="rock-dust"></span><span class="rock-body"></span>';
+            rock.style.left = laneXOnRoad(Number(rock.dataset.entryLane),0.22)+'%';
+            rock.style.top = rock.dataset.top+'px';
+            rock.style.transform = "scale(0)";
+            rock.style.opacity = "0";
+
+            ui.gameEntities.appendChild(rock);
+        }, 1000);
+    }
+
+    function handleCollision(el) {
+      if (el.dataset.type === 'warning' || el.dataset.hit === 'true') return;
+      
+      el.dataset.hit = "true";
+      const type = el.dataset.type;
+
+      if (type === 'health_star') {
+        // A collected star cannot revive a finished run or exceed full health.
+        if (gameState.mistakes > 0 && gameState.mistakes < MAX_LIVES) {
+          gameState.mistakes--;
+          updateHearts();
+          ui.feedback.innerHTML='<span class="text-green-300 font-bold">⭐ 恢復一格生命！</span>';
+        } else if (gameState.mistakes === 0) {
+          ui.feedback.innerHTML='<span class="text-green-300 font-bold">⭐ 生命已滿！</span>';
+        }
+        el.remove();
+      } else if (type === 'car') {
+        takeDamage("CRASH! 車禍 💥");
+        el.classList.add(Math.random() > 0.5 ? 'anim-flip-crash' : 'anim-flip-crash-left');
+      } else if (type === 'rock') {
+        takeDamage("SMASH! 撞擊落石 🪨");
+        el.remove();
+      } else if (type === 'word') {
+        const word = el.innerText;
+        const correctWord = gameState.queue[gameState.currentIdx].en;
+        
+        if (word === correctWord) {
+          gameState.correctCount += 1;
+          ui.correctCountDisplay.innerText = gameState.correctCount;
+          ui.feedback.innerHTML = `<span class="text-green-400 drop-shadow-md text-lg">PERFECT DRIFT! 🎉</span>`;
+          ui.playerCar.classList.add('boosting');
+          
+          el.classList.add('anim-collect');
+          setTimeout(() => el.remove(), 500);
+          setTimeout(() => ui.playerCar.classList.remove('boosting'), 500);
+
+          gameState.currentIdx++;
+          document.querySelectorAll('[data-type="word"]').forEach(w => {
+             if(w !== el) w.dataset.hit = 'true';
+             if(w !== el) w.animate([{opacity:1}, {opacity:0}], {duration:200}).onfinish = () => w.remove();
+          });
+          
+          setTimeout(showNextQuestion, 800);
+
+        } else {
+          ui.feedback.innerHTML = '<span class="text-yellow-400 font-bold">選錯字了，再試一次！不扣血 ❌</span>';
+          el.animate([{transform: `scale(${el.getBoundingClientRect().width/100}) rotate(360deg)`, opacity: 0}], {duration: 500}).onfinish = () => el.remove();
+        }
+      }
+    }
+
+    function takeDamage(msg) {
+      if (gameState.mistakes >= MAX_LIVES) return;
+      const now = Date.now();
+      if (now - gameState.lastHitTime < 1000) return;
+      gameState.lastHitTime = now;
+
+      gameState.mistakes++;
+      updateHearts();
+      ui.feedback.innerHTML = `<span class="text-red-500 font-bold">${msg}</span>`;
+      
+      ui.playerCar.classList.add('player-hit');
+      ui.trackPanel.classList.add('shake-screen');
+
+      setTimeout(() => {
+        ui.trackPanel.classList.remove('shake-screen');
+        ui.playerCar.classList.remove('player-hit');
+      }, 500);
+
+      if (gameState.mistakes >= MAX_LIVES) {
+        setTimeout(() => endGame(false), 800);
+      }
+    }
+
+    function isLaneFree(lanePos) {
+      // 包含 warning 類型
+      const entities = document.querySelectorAll('.game-object:not(#playerCar)');
+      const horizonY = roadScreenY(0);
+      
+      for (let el of entities) {
+        const elLeft = parseFloat(el.dataset.baseLane || 50); 
+        const elTop = parseFloat(el.dataset.top || -150);
+        
+        // 擴大偵測範圍，確保警告期間也不會重疊
+        if (elTop < horizonY + 150) { 
+             if (Math.abs(elLeft - lanePos) < 15) return false;
+        }
+      }
+      return true;
+    }
+
+    function spawnManager() {
+      if (document.hidden) return;
+      if (!gameState.isRunning) return;
+      if (gameState.currentIdx >= gameState.queue.length) return;
+
+      const now = Date.now();
+      if (Math.random() < 0.2 && now - lastRockTime > 2000) {
+          spawnRock();
+          lastRockTime = now;
+      }
+
+      if (now-lastHealthStarTime >= HEALTH_STAR_COOLDOWN &&
+          !ui.gameEntities.querySelector('[data-type="health_star"]') && Math.random()<0.12) {
+        const lane=shuffle([...LANES]).find(isLaneFree);
+        if (lane !== undefined) {
+          spawnHealthStar(lane);
+          lastHealthStarTime=now;
+        }
+      }
+
+      const freeLanes = LANES.filter(isLaneFree);
+      if (now-lastWordTime >= wordSpawnInterval) {
+        // Keep each wave together: one correct answer and one distinct distractor.
+        // Wait for two lanes rather than sending a lone option.
+        if (freeLanes.length < 2) return;
+        const lanes = shuffle([freeLanes[0], freeLanes[freeLanes.length-1]]);
+        const correctWord = gameState.queue[gameState.currentIdx].en;
+        const wrongWord = shuffle(allWords.filter(word => word !== correctWord))[0];
+        spawnWord(correctWord, lanes[0]);
+        spawnWord(wrongWord, lanes[1]);
+        lastWordTime = now;
+        wordSpawnInterval = WORD_SPAWN_INTERVAL + Math.floor(Math.random()*2)*1000;
+        return;
+      }
+      // Preserve gaps between waves instead of filling every tick with traffic.
+      if (freeLanes.length && Math.random() < 0.35) {
+        spawnTraffic(shuffle(freeLanes)[0]);
+      }
+    }
+
+    function spawnTraffic(lane) {
+      const horizonY = roadScreenY(0);
+
+      // [新增] 敵車預警
+      const warning = document.createElement('div');
+      warning.className = 'game-object lane-warning traffic-warning';
+      warning.hidden = true;
+      warning.style.display = 'none';
+      warning.setAttribute('aria-hidden','true');
+      warning.dataset.baseLane = lane;
+      warning.style.left = laneXOnRoad(lane, 0) + '%';
+      warning.style.top = horizonY + 'px';
+      warning.style.transform = 'translateX(-50%) scale(0.45)';
+      warning.dataset.top = horizonY; 
+      warning.dataset.type = 'warning';
+      ui.gameEntities.appendChild(warning);
+
+      const runId=gameState.runId;
+      setTimeout(async () => {
+        warning.remove();
+        if(runId!==gameState.runId) return;
+        if (!gameState.isRunning) return;
+
+        const spriteIndex=Math.floor(Math.random()*CAR_IMAGES.length);
+        await trafficSprites[spriteIndex];
+        if(runId!==gameState.runId || !gameState.isRunning || document.hidden) return;
+        const el = document.createElement('div');
+        // 確保使用相同的 car-size
+        el.className = "game-object traffic-car car-size";
+        el.dataset.type = "car";
+        el.dataset.trafficSpeed = 36 + Math.random() * 18; 
+        
+        el.dataset.currentTrafficSpeed=Number(el.dataset.trafficSpeed)*0.45;
+        // Anchor beyond the CURRENT horizon, never infer depth from a stale screen Y.
+        el.dataset.distance=gameState.roadDistance+ROAD_VIEW*1.08;
+        el.dataset.baseLane = lane;
+        initTrafficSteering(el,lane);
+      el.style.left = lane + '%';
+        
+        el.dataset.top = roadScreenY(0)-el.offsetHeight;
+        el.style.top = roadScreenY(0) + 'px';
+        
+        el.style.transform = "scale(0)";
+        el.style.opacity = "0";
+
+        const imgName = CAR_IMAGES[spriteIndex];
+        const fallbackColor = FALLBACK_COLORS[Math.floor(Math.random() * FALLBACK_COLORS.length)];
+
+        el.innerHTML = `
+          <div class="car-body">
+            <img src="${imgName}" class="car-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div class="fallback-rect ${fallbackColor} rounded-md shadow-lg border border-gray-400"></div>
+          </div>
+        `;
+        ui.gameEntities.appendChild(el);
+      }, 800); // 0.8秒預警
+    }
+
+    function spawnHealthStar(lane) {
+      const el=document.createElement('div');
+      const horizonY=roadScreenY(0);
+      el.className='game-object health-star';
+      el.textContent='★';
+      el.setAttribute('aria-label','補血星星：恢復一格生命');
+      el.dataset.type='health_star';
+      el.dataset.speed=5;
+      el.dataset.baseLane=lane;
+      el.dataset.top=horizonY;
+      el.style.left=laneXOnRoad(lane,0)+'%';
+      el.style.top=horizonY+'px';
+      el.style.transform='translateX(-50%) scale(0)';
+      el.style.opacity='0';
+      ui.gameEntities.appendChild(el);
+      return el;
+    }
+
+    function spawnWord(text, lane) {
+      const el = document.createElement('div');
+      el.className = "game-object word-item";
+      el.dataset.type = "word";
+      el.dataset.word = text;
+      el.innerText = text;
+      el.dataset.speed = 5; 
+      
+      el.dataset.baseLane = lane;
+      el.style.left = lane + '%';
+      
+      const horizonY = roadScreenY(0);
+      el.dataset.top = horizonY;
+      el.style.top = horizonY + 'px';
+      
+      el.style.transform = "scale(0)";
+      el.style.opacity = "0";
+
+      ui.gameEntities.appendChild(el);
+    }
+
+    function endGame(isWin) {
+      gameState.isRunning = false;
+      clearInterval(gameState.spawnerLoop);
+      cancelAnimationFrame(gameState.gameLoop);
+      
+      ui.trackPanel.style.cursor = 'default'; 
+      ui.questionArea.classList.add('hidden');
+      ui.resultScreen.classList.remove('hidden');
+      ui.gameEntities.innerHTML = "";
+      ui.playerCar.classList.remove('player-hit');
+
+      if (isWin) {
+        ui.resultEmoji.innerText = "🏁";
+        ui.resultTitle.innerText = "COURSE CLEAR";
+        ui.resultTitle.className = "text-4xl font-bold mb-2 text-yellow-400 game-font italic";
+        ui.resultDesc.innerText = `制霸山道！答對 ${gameState.correctCount} 題`;
+        ui.progressBar.style.width = "100%";
+      } else {
+        ui.resultEmoji.innerText = "🚔";
+        ui.resultTitle.innerText = "DNF";
+        ui.resultTitle.className = "text-4xl font-bold mb-2 text-red-600 game-font italic";
+        ui.resultDesc.innerText = `車輛損毀，答對 ${gameState.correctCount} 題。`;
+      }
+    }
+    applyRoadVisuals();
+    function resizeGame() {
+      document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
+      applyRoadVisuals(); constrainPlayer(); renderPlayer();
+    }
+    window.addEventListener('resize', resizeGame);
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', resizeGame);
+    resizeGame();
+  </script>
+</body>
+</html>
