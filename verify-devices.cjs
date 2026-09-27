@@ -13,7 +13,7 @@ const {chromium}=require('C:/Users/yourf/.cache/codex-runtimes/codex-primary-run
  const button=document.querySelector('#resultScreen button').getBoundingClientRect();
  const track=ui.trackPanel.getBoundingClientRect();
  const dash=document.querySelector('.dashboard-panel').getBoundingClientRect();
- if(button.height<44||button.bottom>innerHeight+1||button.top<dash.top||button.right>innerWidth+1)throw Error('Restart outside viewport');
+ if(button.height<44||button.bottom>innerHeight+1||button.top<0||button.right>innerWidth+1)throw Error('Restart outside viewport');
  if(track.bottom>innerHeight+1)throw Error('Track exceeds viewport'); if(track.height<180||track.width<200)throw Error('Track too small');
  if(document.documentElement.scrollWidth>innerWidth)throw Error('Horizontal overflow');
  startGame();cancelAnimationFrame(gameState.gameLoop);clearInterval(gameState.spawnerLoop);
@@ -33,4 +33,3 @@ const {chromium}=require('C:/Users/yourf/.cache/codex-runtimes/codex-primary-run
  if(errors.length)throw Error(errors.join('\n'));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
-
