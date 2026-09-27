@@ -1356,8 +1356,7 @@
 
     // Opposing traffic moves toward the player in world space, independently of camera speed.
     function trafficSpeed(el) {
-      const baseSpeed = Number(el.dataset.trafficSpeed || 45);
-      return baseSpeed * (1 + 0.10 * clamp(gameState.correctCount, 0, gameState.queue.length));
+      return 24; // Easy mode: constant approach speed, independent of score.
     }
 
     function initTrafficSteering(el, lane) {
@@ -1430,12 +1429,8 @@
         if(el.dataset.type === 'car') {
           const dt=gameState.frameStep/60;
           const target=trafficSpeed(el);
-          const current=Number(el.dataset.currentTrafficSpeed || target);
-          // Smooth acceleration, including vehicles already on the road after an answer.
-          const decay=Math.exp(-2.5*dt);
-          const travel=target*dt+(current-target)*(1-decay)/2.5;
-          el.dataset.currentTrafficSpeed=target+(current-target)*decay;
-          el.dataset.distance=Number(el.dataset.distance)-travel;
+          el.dataset.currentTrafficSpeed=target;
+          el.dataset.distance=Number(el.dataset.distance)-target*dt;
         } else if(!isRock) {
           el.dataset.distance=Number(el.dataset.distance)+(ROAD_SPEED-speed*12)*gameState.frameStep/60;
         }
@@ -1810,9 +1805,9 @@
         // 確保使用相同的 car-size
         el.className = "game-object traffic-car car-size";
         el.dataset.type = "car";
-        el.dataset.trafficSpeed = 36 + Math.random() * 18; 
+        el.dataset.trafficSpeed = trafficSpeed(el);
         
-        el.dataset.currentTrafficSpeed=Number(el.dataset.trafficSpeed)*0.45;
+        el.dataset.currentTrafficSpeed=trafficSpeed(el);
         // Anchor beyond the CURRENT horizon, never infer depth from a stale screen Y.
         el.dataset.distance=gameState.roadDistance+ROAD_VIEW*1.08;
         el.dataset.baseLane = lane;

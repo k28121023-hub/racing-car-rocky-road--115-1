@@ -38,12 +38,12 @@ if(alpha>0){
 if(p>=.78){seconds=i/60;break;}
 }
 if(first===null||!seconds||maxAlphaStep>.1)throw Error('Reveal not smooth');
-if(Number(car.dataset.currentTrafficSpeed)<=initialSpeed)throw Error('No acceleration');
+if(Number(car.dataset.currentTrafficSpeed)!==initialSpeed)throw Error('Unexpected acceleration');
 return {width:innerWidth,correct:gameState.correctCount,firstVisibleProgress:first,approachSeconds:seconds,maxAlphaStep};
 }));
 }
 }
-if(results[1].approachSeconds>=results[0].approachSeconds*.85)throw Error('Difficulty too subtle');
+for(let i=0;i<results.length;i+=2) if(results[i].approachSeconds!==results[i+1].approachSeconds)throw Error('Score changed approach speed');
 console.log(results);
 if(errors.length)throw Error(errors.join('\n'));
 await page.screenshot({path:'traffic-approach.png'});
