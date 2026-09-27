@@ -60,7 +60,7 @@
       }
       
       /* 標題欄緊湊化 */
-      .dashboard-panel > div:first-child {
+      .dashboard-header {
         margin-bottom: 4px !important;
         padding-bottom: 4px !important;
         border-bottom: 1px solid #333;
@@ -551,7 +551,7 @@
         grid-template-columns: minmax(0, 1fr);
         grid-template-rows: minmax(0, 1fr) clamp(180px, 27%, 260px); }
       .dashboard-panel { padding: 8px 12px !important; }
-      .dashboard-panel > div:first-child { margin-bottom: 4px !important; padding-bottom: 4px !important; }
+      .dashboard-header { margin-bottom: 4px !important; padding-bottom: 4px !important; }
       .dashboard-panel h1 { font-size: 1rem !important; }
       .dashboard-panel h1 br { display: none; }
       #questionArea { padding: 0 !important; flex-direction: row !important; gap: 12px; }
@@ -566,7 +566,7 @@
       .main-grid { width: 100%; max-height: none; border: 0;
         grid-template-columns: minmax(0, 1fr) clamp(200px, 30vw, 280px); grid-template-rows: 100%; }
       .dashboard-panel { padding: 8px 12px !important; }
-      .dashboard-panel > div:first-child { margin-bottom: 4px !important; padding-bottom: 4px !important; }
+      .dashboard-header { margin-bottom: 4px !important; padding-bottom: 4px !important; }
       .dashboard-panel h1 { font-size: 1rem !important; }
       .dashboard-panel h1 br { display: none; }
       #startScreen > .text-6xl, #startScreen p, #resultScreen > .text-6xl, .controls-hint { display: none; }
@@ -587,6 +587,30 @@
       padding: max(16px, env(safe-area-inset-top)) 20px max(16px, env(safe-area-inset-bottom));
       background: rgba(0,0,0,.94); gap: 12px; }
     #resultScreen button { width: min(100%, 320px); min-height: 48px; flex-shrink: 0; }
+    #directionPad { display: none; position: absolute; right: 10px; bottom: 24px;
+      grid-template: repeat(3, 46px) / repeat(3, 46px); gap: 3px; z-index: 30; touch-action: none; }
+    #directionPad button { background: #293447; border: 1px solid #718096; border-radius: 10px;
+      color: white; font-size: 24px; touch-action: none; padding: 0; }
+    #directionPad button.pressed { background: #b45309; border-color: #fcd34d; }
+    #directionPad [data-key="ArrowUp"] { grid-area: 1 / 2; }
+    #directionPad [data-key="ArrowLeft"] { grid-area: 2 / 1; }
+    #directionPad [data-key="ArrowRight"] { grid-area: 2 / 3; }
+    #directionPad [data-key="ArrowDown"] { grid-area: 3 / 2; }
+    @media (pointer: coarse), (max-width: 768px), (max-height: 600px) {
+      body.is-playing #directionPad { display: grid; }
+      body.is-playing .dashboard-panel { padding-right: 162px !important; }
+      body.is-playing .dashboard-panel h1, body.is-playing .device-hint { display: none; }
+      body.is-playing #questionArea { flex-direction: column !important; gap: 2px; justify-content: center; }
+      body.is-playing #qText { font-size: 20px !important; }
+      body.is-playing #feedback { font-size: 11px; text-align: left; }
+      body.is-playing .question-card { flex: initial; }
+    }
+    @media (orientation: landscape) and (max-height: 600px) {
+      body.is-playing .dashboard-panel { padding-right: 12px !important; padding-bottom: 174px !important; }
+    }
+    @media (pointer: coarse) and (orientation: landscape) and (min-width: 769px) {
+      body.is-playing .dashboard-panel { padding-right: 12px !important; padding-bottom: 174px !important; }
+    }
   </style>
 </head>
 <body>
@@ -624,7 +648,13 @@
     </div>
 
     <div class="dashboard-panel">
-      <div class="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
+      <div id="directionPad" role="group" aria-label="方向控制：上加速、下後退、左右轉向">
+        <button type="button" data-key="ArrowUp" aria-label="向前／加速">▲</button>
+        <button type="button" data-key="ArrowLeft" aria-label="向左">◀</button>
+        <button type="button" data-key="ArrowRight" aria-label="向右">▶</button>
+        <button type="button" data-key="ArrowDown" aria-label="向後／回到巡航">▼</button>
+      </div>
+      <div class="dashboard-header flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
         <div>
           <h1 class="text-xl md:text-2xl text-white game-font italic transform -skew-x-12 tracking-tighter" style="text-shadow: 0 0 10px rgba(255,255,255,0.3);">
             TOUGE<br><span class="text-yellow-500">DRIFT</span>
@@ -815,6 +845,32 @@
     };
 
     let keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false };
+    const compactDisplay = matchMedia('(max-width: 768px), (max-height: 600px)');
+    const padPointers = new Map();
+    const keyboardKeys = new Set();
+    function syncDirectionKeys() {
+      for (const key of Object.keys(keys)) {
+        keys[key] = keyboardKeys.has(key) || [...padPointers.values()].includes(key);
+        document.querySelector(`#directionPad [data-key="${key}"]`).classList.toggle('pressed', keys[key]);
+      }
+    }
+    document.querySelectorAll('#directionPad button').forEach(button => {
+      button.addEventListener('pointerdown', e => {
+        if (!gameState.isRunning || e.button !== 0) return;
+        e.preventDefault();
+        button.setPointerCapture(e.pointerId);
+        padPointers.set(e.pointerId, button.dataset.key);
+        gameState.targetPlayerX = null;
+        syncDirectionKeys();
+      });
+      for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+        button.addEventListener(type, e => {
+          padPointers.delete(e.pointerId);
+          syncDirectionKeys();
+        });
+      }
+      button.addEventListener('contextmenu', e => e.preventDefault());
+    });
     
     const WORD_SPAWN_INTERVAL = 10000;
     let wordSpawnInterval = WORD_SPAWN_INTERVAL;
@@ -873,6 +929,9 @@
     ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type =>
       ui.trackPanel.addEventListener(type, releasePointer));
     function resetInput() {
+      padPointers.clear();
+      keyboardKeys.clear();
+      syncDirectionKeys();
       gameState.pointerForward=false;
       gameState.lateralVelocity=0;gameState.targetPlayerX=null;
       Object.keys(keys).forEach(key => keys[key] = false);
@@ -897,8 +956,7 @@
       gameState.targetPlayerY = targetY;
       gameState.pointerForward = activePointer !== null && rawY >= 18;
       
-      constrainPlayer();
-      renderPlayer();
+      // Render once in the animation loop, not again for every pointer event.
     }
 
     // Track-width percent per second; integrate in small time steps for all refresh rates.
@@ -926,14 +984,15 @@
     const KEY_SPEED_Y = 1.5;
     
     document.addEventListener('keydown', (e) => {
-      if (keys.hasOwnProperty(e.key) && gameState.isRunning) { e.preventDefault(); keys[e.key] = true; }
+      if (keys.hasOwnProperty(e.key) && gameState.isRunning) { e.preventDefault(); keyboardKeys.add(e.key); syncDirectionKeys(); }
     });
     document.addEventListener('keyup', (e) => {
-      if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
+      if (keys.hasOwnProperty(e.key)) { keyboardKeys.delete(e.key); syncDirectionKeys(); }
     });
 
     // --- 遊戲流程 ---
     function startGame() {
+      document.body.classList.add('is-playing');
       resetInput();
       gameState.queue = shuffle([...questionsData]);
       gameState.currentIdx = 0;
@@ -1080,7 +1139,7 @@
       const camera=sampleRoad(gameState.roadDistance);
       const point=sampleRoad(gameState.roadDistance+depth);
       const lateral=(point.x-camera.x)*Math.cos(camera.heading)-(point.z-camera.z)*Math.sin(camera.heading);
-      const compact = matchMedia('(max-width: 768px), (max-height: 600px)').matches;
+      const compact = compactDisplay.matches;
       const half=compact ? 10+37*p : 6+38*p;
       const room=48-half;
       const center=50+room*Math.tanh(lateral/150);
@@ -1095,10 +1154,10 @@
     function applyRoadVisuals() {
       const canvas=document.getElementById('roadCanvas'), ctx=canvas.getContext('2d');
       const w=ui.trackPanel.clientWidth,h=ui.trackPanel.clientHeight;
-      const dpr=Math.min(window.devicePixelRatio||1,2);
+      const dpr=Math.min(window.devicePixelRatio||1,compactDisplay.matches ? 1.5 : 2);
       if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)) {canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);}
       ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
-      const rows=100, horizon=roadScreenY(0);
+      const rows=compactDisplay.matches ? 60 : 100, horizon=roadScreenY(0);
       const sky=ctx.createLinearGradient(0,0,0,horizon);
       sky.addColorStop(0,'#3b82f6');sky.addColorStop(1,'#c9e5f4');
       ctx.fillStyle=sky;ctx.fillRect(0,0,w,horizon);
@@ -1809,6 +1868,7 @@
     }
 
     function exitToMenu() {
+      document.body.classList.remove('is-playing');
       gameState.isRunning = false;
       gameState.runId++;
       clearInterval(gameState.spawnerLoop);
@@ -1822,6 +1882,7 @@
     }
 
     function endGame(isWin) {
+      document.body.classList.remove('is-playing');
       gameState.isRunning = false;
       gameState.runId++;
       resetInput();
