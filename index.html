@@ -963,17 +963,24 @@
     const STEER_MAX_SPEED = 32;
     const STEER_ACCEL = 90;
     const STEER_BRAKE = 130;
+    const touchSteering = matchMedia('(pointer: coarse)');
     function updateSteering(dt) {
+      // Shorter touch response keeps dragging and direction-pad turns responsive.
+      const mobile = touchSteering.matches;
+      const maxSpeed = mobile ? 40 : STEER_MAX_SPEED;
+      const acceleration = mobile ? 180 : STEER_ACCEL;
+      const brake = mobile ? 240 : STEER_BRAKE;
+      const followRate = mobile ? 8 : 5;
       while (dt > 0.000001) {
         const step=Math.min(dt,1/120);dt-=step;
         const input=Number(keys.ArrowRight)-Number(keys.ArrowLeft);
         const hasKeyboard=keys.ArrowRight||keys.ArrowLeft;
         if(hasKeyboard) gameState.targetPlayerX=null;
         const error=gameState.targetPlayerX===null ? 0 : gameState.targetPlayerX-gameState.playerX;
-        const desired=hasKeyboard ? input*STEER_MAX_SPEED : clamp(error*5,-STEER_MAX_SPEED,STEER_MAX_SPEED);
+        const desired=hasKeyboard ? input*maxSpeed : clamp(error*followRate,-maxSpeed,maxSpeed);
         const old=gameState.lateralVelocity;
         const braking=old*desired<0 || Math.abs(desired)<Math.abs(old);
-        gameState.lateralVelocity+=clamp(desired-old,-(braking?STEER_BRAKE:STEER_ACCEL)*step,(braking?STEER_BRAKE:STEER_ACCEL)*step);
+        gameState.lateralVelocity+=clamp(desired-old,-(braking?brake:acceleration)*step,(braking?brake:acceleration)*step);
         gameState.playerX+=(old+gameState.lateralVelocity)*0.5*step;
         if(gameState.targetPlayerX!==null && Math.abs(error)<0.04 && Math.abs(gameState.lateralVelocity)<0.3) {
           gameState.targetPlayerX=null;
